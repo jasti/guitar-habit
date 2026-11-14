@@ -1,0 +1,4 @@
+# personal progress, logs, and backups stay on the Mac Mini
+data/
+.DS_Store
+node_modules/
