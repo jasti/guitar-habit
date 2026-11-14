@@ -60,6 +60,11 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 - **One-minute changes** are logged per chord pair with personal bests, charted on the Progress tab.
 - **Clean tempo** per song is logged from any play-along with "That tempo felt clean".
 - **Badges** for the first session, 7 and 30 day streaks, coming back after a gap, each song, and more.
+- **Lessons tab** lists all 84 days. Open any day to read it or replay it. Replays log practice
+  (streak, minutes, changes) but never move the program forward, so previewing day 40 doesn't skip days 2 to 39.
+- **Instructor homework** (Settings): list the chords your teacher assigned, for example `A, D, E, G, C`,
+  and every session gets a short extra block: the shapes on odd days, a one-minute changes round on one
+  of the pairs on even days. The pairs also appear first in the Tools changes counter.
 - Settings lets you set the current day by hand to repeat a week or skip ahead, and reset with a backup.
 
 ## API
@@ -67,9 +72,9 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 | Call | Does |
 | --- | --- |
 | `GET /api/state` | Full state plus computed stats |
-| `POST /api/session` | Log a session `{date, day, minutes, mood, win, short}` |
+| `POST /api/session` | Log a session `{date, day, minutes, mood, win, short, replay}` |
 | `POST /api/metric` | Log `{type:'changes', pair, count}` or `{type:'tempo', song, bpm}` |
-| `POST /api/profile` | Set `{name}` or `{currentDay}` |
+| `POST /api/profile` | Set `{name}`, `{currentDay}`, or `{homework: {chords, minutes}}` |
 | `GET /api/export` | Download the state file |
 | `POST /api/reset` | `{confirm:'RESET'}`, keeps a backup in `data/` |
 

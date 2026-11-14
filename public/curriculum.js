@@ -15,6 +15,10 @@ window.CURRICULUM = (() => {
       tip: 'Middle and ring on the D and G at the 2nd fret, index on the B at the 1st. Skip the low E.' },
     'C':    { full: 'C major', frets: ['x', 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0],
       tip: 'Ring on the A at the 3rd fret, middle on the D at the 2nd, index on the B at the 1st. Coming from Am, only the ring finger moves.' },
+    'A':    { full: 'A major', frets: ['x', 0, 2, 2, 2, 0], fingers: [0, 0, 1, 2, 3, 0],
+      tip: 'Three fingers in a row on the D, G and B strings at the 2nd fret. Squeeze them together and keep them upright so the high E rings. Skip the low E.' },
+    'E':    { full: 'E major', frets: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0],
+      tip: 'Em plus the index finger on the G string at the 1st fret. All six strings ring. Em to E is a one-finger change.' },
   };
 
   // Eight slots per bar (eighth notes). D = down strum, U = up strum, '' = hand keeps moving, misses the strings.
@@ -379,18 +383,44 @@ window.CURRICULUM = (() => {
     ];
   }
 
-  function buildDay(n) {
+  // Instructor homework: a short block appended to every day, built from the chords your teacher assigned.
+  // Odd days rotate through the shapes; even days run a one-minute changes round on one pair.
+  function homeworkBlock(n, hw) {
+    const chords = (hw && hw.chords || []).filter(c => CHORDS[c]);
+    if (chords.length === 0) return null;
+    const minutes = hw.minutes || 3;
+    if (chords.length === 1 || n % 2 === 1) {
+      return chord(minutes, chords, [
+        'Your instructor\'s chords. Build each one, pluck every string, release, move to the next.',
+        'Keep a tally of which one buzzes most. That one gets an extra round.',
+        chords.length > 1 ? `Then cycle ${chords.join(', ')} in order, four slow strums each, without stopping.` : 'Then strum it with the metronome under Tools at 60 bpm.',
+      ], 'Instructor homework');
+    }
+    const pairs = []; for (let i = 0; i < chords.length - 1; i++) pairs.push([chords[i], chords[i + 1]]);
+    if (chords.length > 2) pairs.push([chords[chords.length - 1], chords[0]]);
+    const pair = pairs[Math.floor(n / 2) % pairs.length];
+    return { ...changes(minutes, pair, ['One of your instructor\'s pairs. Tap once per clean change.', 'Each pair comes around every few days. Beat your last number by one.']), title: 'Instructor homework' };
+  }
+  function withHomework(blocks, n, hw) {
+    const b = homeworkBlock(n, hw); if (!b) return blocks;
+    const out = blocks.slice();
+    const last = out[out.length - 1];
+    if (last && last.type === 'text' && /cool|check-in|graduation/i.test(last.title)) out.splice(out.length - 1, 0, b); else out.push(b);
+    return out;
+  }
+
+  function buildDay(n, opts = {}) {
     n = Math.max(1, Math.floor(n));
     if (n > TOTAL_DAYS) {
       return { day: n, week: WEEKS.length + 1, dayInWeek: ((n - 1) % 7) + 1, title: 'Keep playing', phase: 'Beyond',
         goal: 'Keep both songs in your fingers and pick a third.', why: 'Habits outlive programs. Fifteen minutes a day is still the whole trick.',
-        blocks: beyondPlan(n), isReview: false, encouragement: ENCOURAGEMENTS[n % ENCOURAGEMENTS.length], beyond: true };
+        blocks: withHomework(beyondPlan(n), n, opts.homework), isReview: false, encouragement: ENCOURAGEMENTS[n % ENCOURAGEMENTS.length], beyond: true };
     }
     const week = Math.ceil(n / 7);
     const d = ((n - 1) % 7) + 1;
     const w = WEEKS[week - 1];
     return { day: n, week, dayInWeek: d, title: w.title, phase: w.phase, goal: w.goal, why: w.why,
-      blocks: w.plan(d), isReview: d === 7, encouragement: ENCOURAGEMENTS[(n - 1) % ENCOURAGEMENTS.length], beyond: false };
+      blocks: withHomework(w.plan(d), n, opts.homework), isReview: d === 7, encouragement: ENCOURAGEMENTS[(n - 1) % ENCOURAGEMENTS.length], beyond: false };
   }
 
   // Five-minute fallback: one technique block and one song block, trimmed.
@@ -404,5 +434,5 @@ window.CURRICULUM = (() => {
 
   function totalMinutes(blocks) { return blocks.reduce((a, b) => a + b.minutes, 0); }
 
-  return { CHORDS, PATTERNS, SONGS, WEEKS, MILESTONES, TOTAL_DAYS, buildDay, shortBlocks, totalMinutes };
+  return { CHORDS, PATTERNS, SONGS, WEEKS, MILESTONES, TOTAL_DAYS, buildDay, shortBlocks, totalMinutes, homeworkBlock };
 })();

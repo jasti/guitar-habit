@@ -28,7 +28,7 @@ function todayLocal() {
 function defaultState() {
   return {
     version: 1,
-    profile: { name: '', startDate: todayLocal(), songs: ['horse', 'knockin'] },
+    profile: { name: '', startDate: todayLocal(), songs: ['horse', 'knockin'], homework: { chords: [], minutes: 3 } },
     progress: { currentDay: 1 },
     sessions: [],          // { ts, date, day, minutes, mood, win, short, blocks }
     metrics: { changes: [], tempo: [] }, // changes: { ts, date, pair, count }  tempo: { ts, date, song, bpm }
@@ -40,6 +40,7 @@ function loadState() {
     const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     const s = defaultState();
     Object.assign(s.profile, raw.profile || {});
+    if (!s.profile.homework || !Array.isArray(s.profile.homework.chords)) s.profile.homework = { chords: [], minutes: 3 };
     Object.assign(s.progress, raw.progress || {});
     s.sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
     s.metrics.changes = (raw.metrics && raw.metrics.changes) || [];
@@ -151,10 +152,12 @@ async function api(req, res, url) {
       mood: clampInt(b.mood, 1, 5, 3),
       win: str(b.win, 280),
       short: !!b.short,
+      replay: !!b.replay,
       blocks: clampInt(b.blocks, 0, 50, 0),
     };
     state.sessions.push(session);
-    if (day >= state.progress.currentDay) state.progress.currentDay = day + 1;
+    // A replay of any lesson counts as practice (streak, minutes) but never moves the program forward.
+    if (!session.replay && day >= state.progress.currentDay) state.progress.currentDay = day + 1;
     const newBadges = awardBadges(state, date, { gapBefore });
     saveState(state);
     return send(res, 200, { ...publicState(date), newBadges });
@@ -179,6 +182,10 @@ async function api(req, res, url) {
     const b = await readBody(req);
     if ('name' in b) state.profile.name = str(b.name, 40);
     if ('currentDay' in b) state.progress.currentDay = clampInt(b.currentDay, 1, 100000, state.progress.currentDay);
+    if (b.homework && typeof b.homework === 'object') {
+      const chords = Array.isArray(b.homework.chords) ? b.homework.chords.map(c => str(c, 8).trim()).filter(Boolean).slice(0, 12) : [];
+      state.profile.homework = { chords: [...new Set(chords)], minutes: clampInt(b.homework.minutes, 1, 10, 3) };
+    }
     saveState(state);
     return send(res, 200, publicState(today));
   }
