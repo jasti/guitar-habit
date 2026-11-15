@@ -1,52 +1,78 @@
 # Guitar Habit
 
-Fifteen minutes a day. Two acoustic songs in twelve weeks. Runs on the Mac Mini, used from your iPhone.
+Fifteen minutes a day. Three acoustic songs in twelve weeks. A tiny self-hosted practice app for
+absolute beginners: it runs on a Mac (or any machine with Node) and you use it from your phone.
 
-- **Song 1, weeks 1 to 8:** A Horse with No Name (Em, D6/9). Two chords, one strumming pattern.
-- **Song 2, weeks 9 to 12:** Knockin' on Heaven's Door (G, D, Am, C). Same strumming pattern, four new chords.
-- **Song 3, any time:** Three Little Birds (A, D, E). The instructor song: once your homework list covers
-  A, D and E, every third session's homework block is a slow play-along of it.
+No accounts, no cloud, no dependencies, no build step. One Node file serves a vanilla JS web app and
+keeps your progress in a single JSON file.
 
-Every day is a 14 to 15 minute session of three to five timed blocks: warm-up, a chord or
-technique drill, strumming or a play-along with the built-in metronome, and a cool-down.
-Day 7 of each week is a review day with a check-in and a prompt to record yourself.
-After day 84 the app keeps serving maintenance days so the habit does not end with the program.
+<p align="center">
+  <img src="docs/today.jpg" width="230" alt="Today tab with streak and the day's plan">
+  <img src="docs/practice.jpg" width="230" alt="A practice block with the sticky session clock and chord diagram">
+  <img src="docs/progress.jpg" width="230" alt="Progress tab with the 84-day grid and minutes per day">
+</p>
+
+## Features
+
+- **A 12-week program as data.** 84 days of timed blocks: warm-up, chord drill, strumming, play-along,
+  cool-down. Each week is a function of the day, so a week definition produces seven varied sessions.
+- **Three songs, chord charts only.** A Horse with No Name (Em, D6/9) in weeks 1 to 8, Knockin' on
+  Heaven's Door (G, D, Am, C) in weeks 9 to 12, and Three Little Birds (A, D, E) as the instructor song.
+  Structure, tempo and chords. No lyrics.
+- **Built-in tools.** Web Audio lookahead metronome with strumming patterns and a count-in, animated
+  play-along that scrolls the chord bars, SVG chord diagrams with finger numbers, reference tuner tones,
+  and a one-minute chord-change counter with personal bests.
+- **Completion-based progression.** Finishing a session advances the day. Missing days breaks the streak,
+  never skips content. A 5-minute fallback keeps the streak alive on bad days.
+- **Lessons browser.** Read or replay any day. Replays count as practice but never move the program forward.
+- **Instructor homework.** Type the chords your teacher assigned and every session gets a short block:
+  shapes one day, a changes round on one pair the next, a slow play-along once the list covers a song.
+- **Honest time tracking.** A sticky session clock logs real wall-clock minutes, with a running day total
+  and a minutes-per-day chart.
+- **Streaks, badges, confetti.** Because habits need a little dopamine.
+- **Phone first.** Add it to the iPhone home screen and it runs full screen. Dark and light themes.
+  Works around iOS muting browser audio on the silent switch.
 
 ## Run it
 
+Requires Node.js 18 or newer.
+
 ```bash
+git clone https://github.com/jasti/guitar-habit.git
+cd guitar-habit
 node server.js
 ```
 
-Then open `http://localhost:4321` on the Mac, or on your phone (same Wi-Fi):
+Open `http://localhost:4321` on the computer, or from your phone on the same Wi-Fi:
 
 ```
-http://Vamsees-Mac-mini.local:4321
+http://<your-computer-name>.local:4321
 ```
 
-If the `.local` name does not resolve on the phone, use the Mac's IP, which the server prints on start.
+The server prints the exact addresses, including the LAN IP, when it starts. `PORT=8080 node server.js`
+changes the port.
 
-### Start at login, restart if it crashes
+### Start at login on macOS
 
 ```bash
 ./install-service.sh
 ```
 
-This copies `com.vj.guitar-habit.plist` into `~/Library/LaunchAgents` and loads it. Logs go to
-`data/server.log`. Remove it with `./install-service.sh uninstall`.
+This writes a LaunchAgent for the current folder and loads it, so the app starts at login and restarts
+if it crashes. Logs go to `data/server.log`. Remove it with `./install-service.sh uninstall`.
 
 ### Put it on the iPhone home screen
 
 1. Open the address above in Safari.
 2. Tap Share, then **Add to Home Screen**.
-3. It opens full-screen like an app, with no browser chrome.
+3. It opens full screen like an app.
 
 No sound on the iPhone? Flip the Ring/Silent switch to ring and turn the volume up. iOS mutes browser
-audio on silent, and the app plays a silent clip on every tap to work around it, but that does not always
+audio on silent; the app plays a silent clip on every tap to work around it, but that does not always
 win. Tools has a **Test sound** button. After the phone locks, the first tap wakes the audio up again.
 
 Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightness → Auto-Lock to
-5 minutes, or just tap the screen now and then. The block timer chimes when time is up.
+5 minutes, or tap the screen now and then. The block timer chimes when time is up.
 
 ## What is where
 
@@ -55,7 +81,7 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 | `server.js` | Node server, no dependencies. Static files plus a small JSON API. |
 | `public/curriculum.js` | The whole program as data: chords, patterns, songs, 12 weeks of blocks. Edit freely. |
 | `public/app.js` | The client: session runner, metronome, chord trainer, play-along, progress. |
-| `data/state.json` | Your progress. One file. Back it up or export it from Settings. |
+| `data/state.json` | Your progress. One file, never committed. Back it up or export it from Settings. |
 
 ## How progression works
 
@@ -67,13 +93,11 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 - **Clean tempo** per song is logged from any play-along with "That tempo felt clean".
 - **Badges** for the first session, 7 and 30 day streaks, coming back after a gap, each song, and more.
 - **Session clock.** A sticky header shows the block countdown, the real time spent so far this session, and
-  your running total for the day. Sessions log wall-clock time, not planned time, so the day total on Today
-  and the minutes-per-day chart on Progress show what you actually did.
+  your running total for the day. Sessions log wall-clock time, not planned time.
 - **Lessons tab** lists all 84 days. Open any day to read it or replay it. Replays log practice
   (streak, minutes, changes) but never move the program forward, so previewing day 40 doesn't skip days 2 to 39.
 - **Instructor homework** (Settings): list the chords your teacher assigned, for example `A, D, E, G, C`,
-  and every session gets a short extra block: the shapes on odd days, a one-minute changes round on one
-  of the pairs on even days. The pairs also appear first in the Tools changes counter.
+  and every session gets a short extra block. The pairs also appear first in the Tools changes counter.
 - Settings lets you set the current day by hand to repeat a week or skip ahead, and reset with a backup.
 
 ## API
@@ -90,5 +114,13 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 ## Changing the program
 
 Everything is in `public/curriculum.js`. To add a song, add an entry to `SONGS` with its chords,
-tempo, pattern and sections, and any chord shapes it needs to `CHORDS`. Weeks are functions of the
-day-in-week, so one week definition produces seven varied days. Reload the page, no build step.
+tempo, pattern and sections, and any chord shapes it needs to `CHORDS`. Mark it `instructor: true`
+and the homework block will rotate it in once the homework chords cover it. Weeks are functions of
+the day-in-week, so one week definition produces seven varied days. Reload the page, no build step.
+
+The song charts are practice structures (which chord, how many bars), not transcriptions. Listen to the
+records for the feel and the words.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
