@@ -35,7 +35,7 @@ window.CURRICULUM = (() => {
 
   const SONGS = {
     horse: {
-      id: 'horse', title: 'A Horse with No Name', artist: 'America', year: 1972,
+      id: 'horse', title: 'A Horse with No Name', artist: 'America', year: 1972, when: 'weeks 1 to 8',
       chords: ['Em', 'D6/9'], bpm: 122, pattern: 'd_du_udu',
       sections: [
         { name: 'Intro',   bars: alt(4, 'Em', 'D6/9') },
@@ -53,7 +53,7 @@ window.CURRICULUM = (() => {
       ],
     },
     knockin: {
-      id: 'knockin', title: "Knockin' on Heaven's Door", artist: 'Bob Dylan', year: 1973,
+      id: 'knockin', title: "Knockin' on Heaven's Door", artist: 'Bob Dylan', year: 1973, when: 'weeks 9 to 12',
       chords: ['G', 'D', 'Am', 'C'], bpm: 70, pattern: 'd_du_udu',
       sections: [
         { name: 'Verse 1', bars: ['G', 'D', 'Am', 'Am', 'G', 'D', 'C', 'C'] },
@@ -66,6 +66,25 @@ window.CURRICULUM = (() => {
         'Same strumming pattern as the Horse, at a much gentler tempo. Your right hand already knows this song.',
         'Verse and chorus are the same eight bars. Learn eight bars and you have learned the song.',
         'The D to Am change is the hardest one. Give it its own minute every day in week 10.',
+        'This is a practice chart, not a transcription. Listen to the recording for the feel and the lyrics.',
+      ],
+    },
+    birds: {
+      id: 'birds', title: 'Three Little Birds', artist: 'Bob Marley & the Wailers', year: 1977, when: 'instructor song · any time',
+      chords: ['A', 'D', 'E'], bpm: 75, pattern: 'd_du', instructor: true,
+      sections: [
+        { name: 'Intro',   bars: ['A', 'A', 'A', 'A'] },
+        { name: 'Chorus',  bars: ['A', 'A', 'D', 'A', 'A', 'E', 'A', 'A'] },
+        { name: 'Verse 1', bars: ['A', 'E', 'A', 'D', 'A', 'E', 'D', 'A'] },
+        { name: 'Chorus',  bars: ['A', 'A', 'D', 'A', 'A', 'E', 'A', 'A'] },
+        { name: 'Verse 2', bars: ['A', 'E', 'A', 'D', 'A', 'E', 'D', 'A'] },
+        { name: 'Chorus',  bars: ['A', 'A', 'D', 'A', 'A', 'E', 'A', 'A'] },
+        { name: 'Outro',   bars: ['A', 'A', 'A', 'A'] },
+      ],
+      notes: [
+        'Built on A, D and E, the three chords your instructor started you on. Everything you drill in class lands here.',
+        'The chorus is nearly all A. Sit on it, relax the hand, and treat the D and E as short visits.',
+        'The record has a laid-back reggae feel. Start with plain down strums at 60, then the D DU pattern, then lighten the down strums on beats 1 and 3 to get the lilt.',
         'This is a practice chart, not a transcription. Listen to the recording for the feel and the lyrics.',
       ],
     },
@@ -379,17 +398,33 @@ window.CURRICULUM = (() => {
       v === 1 ? play(6, 'knockin', 'all', 70, null, ['Keep song 2 alive. Try singing a verse out loud.']) :
                 strum(6, 70, 'd_du_udu', ['G', 'D', 'Am', 'C', 'Em'], 2, ['Free loop over all your chords. Try changing the order.'], 'Free play'),
       v === 2 ? play(5, 'horse', 'all', 122, null, ['Song 1 to finish.']) : play(5, v === 0 ? 'knockin' : 'horse', 'all', v === 0 ? 70 : 122, null, ['The other song, to finish.']),
-      cool(2, ['Shake out both hands.', 'Ready for song 3? Pick one with chords you already know: G, C, D, Em, Am cover hundreds of songs.']),
+      cool(2, ['Shake out both hands.', 'Three Little Birds is waiting under Songs. After that, pick a fourth: G, C, D, Em, Am, A, E cover hundreds of songs.']),
     ];
   }
 
   // Instructor homework: a short block appended to every day, built from the chords your teacher assigned.
-  // Odd days rotate through the shapes; even days run a one-minute changes round on one pair.
+  // Shapes one day, a one-minute changes round on one pair the next. Once the list covers all the chords
+  // of an instructor song (A, D, E for Three Little Birds), every third day becomes a play-along of it.
+  function homeworkSongs(chords) {
+    return Object.values(SONGS).filter(s => s.instructor && s.chords.every(c => chords.includes(c)));
+  }
   function homeworkBlock(n, hw) {
     const chords = (hw && hw.chords || []).filter(c => CHORDS[c]);
     if (chords.length === 0) return null;
     const minutes = hw.minutes || 3;
-    if (chords.length === 1 || n % 2 === 1) {
+    const songs = homeworkSongs(chords);
+    if (songs.length && chords.length > 1 && n % 3 === 0) {
+      const song = songs[Math.floor(n / 3) % songs.length];
+      const section = Math.floor(n / 3) % 2 ? ['Verse 1', 'Chorus'] : ['Chorus'];
+      return play(minutes, song.id, section, 60, null, [
+        `Your instructor's chords in a real song: ${song.chords.join(', ')} are all of ${song.title}.`,
+        'Slow and even. Keep the strumming hand moving through every change, buzz or no buzz.',
+        'Add 5 bpm with the arrows when a run feels clean, and log it so the Songs tab remembers.',
+      ], 'Instructor homework');
+    }
+    const shapesDay = songs.length && chords.length > 1 ? n % 3 === 1 : n % 2 === 1;
+    const round = songs.length && chords.length > 1 ? Math.floor(n / 3) : Math.floor(n / 2);
+    if (chords.length === 1 || shapesDay) {
       return chord(minutes, chords, [
         'Your instructor\'s chords. Build each one, pluck every string, release, move to the next.',
         'Keep a tally of which one buzzes most. That one gets an extra round.',
@@ -398,7 +433,7 @@ window.CURRICULUM = (() => {
     }
     const pairs = []; for (let i = 0; i < chords.length - 1; i++) pairs.push([chords[i], chords[i + 1]]);
     if (chords.length > 2) pairs.push([chords[chords.length - 1], chords[0]]);
-    const pair = pairs[Math.floor(n / 2) % pairs.length];
+    const pair = pairs[round % pairs.length];
     return { ...changes(minutes, pair, ['One of your instructor\'s pairs. Tap once per clean change.', 'Each pair comes around every few days. Beat your last number by one.']), title: 'Instructor homework' };
   }
   function withHomework(blocks, n, hw) {

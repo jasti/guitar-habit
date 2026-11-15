@@ -28,7 +28,7 @@ function todayLocal() {
 function defaultState() {
   return {
     version: 1,
-    profile: { name: '', startDate: todayLocal(), songs: ['horse', 'knockin'], homework: { chords: [], minutes: 3 } },
+    profile: { name: '', startDate: todayLocal(), songs: ['horse', 'knockin', 'birds'], homework: { chords: [], minutes: 3 } },
     progress: { currentDay: 1 },
     sessions: [],          // { ts, date, day, minutes, mood, win, short, blocks }
     metrics: { changes: [], tempo: [] }, // changes: { ts, date, pair, count }  tempo: { ts, date, song, bpm }
@@ -41,6 +41,8 @@ function loadState() {
     const s = defaultState();
     Object.assign(s.profile, raw.profile || {});
     if (!s.profile.homework || !Array.isArray(s.profile.homework.chords)) s.profile.homework = { chords: [], minutes: 3 };
+    if (!Array.isArray(s.profile.songs)) s.profile.songs = [];
+    ['horse', 'knockin', 'birds'].forEach(id => { if (!s.profile.songs.includes(id)) s.profile.songs.push(id); });
     Object.assign(s.progress, raw.progress || {});
     s.sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
     s.metrics.changes = (raw.metrics && raw.metrics.changes) || [];
@@ -93,6 +95,7 @@ const BADGES = [
   { id: 'week4',      name: 'Twenty bars',      desc: 'Finished week 4. The song has begun.',           test: s => s.progress.currentDay > 28 },
   { id: 'song1',      name: 'A Horse with No Name', desc: 'Week 8 complete. You can play a song.',     test: s => s.progress.currentDay > 56 },
   { id: 'song2',      name: "Knockin' on Heaven's Door", desc: 'Week 12 complete. Two songs.',         test: s => s.progress.currentDay > 84 },
+  { id: 'song3',      name: 'Three Little Birds', desc: 'A clean run at the tempo of the record. Your instructor\'s chords, your song.', test: s => s.metrics.tempo.some(m => m.song === 'birds' && m.bpm >= 75) },
   { id: 'changes20',  name: 'Quick hands',      desc: '20 chord changes in one minute.',                test: s => s.metrics.changes.some(m => m.count >= 20) },
   { id: 'changes30',  name: 'Quicker hands',    desc: '30 chord changes in one minute.',                test: s => s.metrics.changes.some(m => m.count >= 30) },
   { id: 'sessions50', name: 'Fifty sessions',   desc: 'Twelve and a half hours of guitar, fifteen minutes at a time.', test: (s, st) => st.totalSessions >= 50 },
@@ -149,6 +152,7 @@ async function api(req, res, url) {
     const session = {
       ts: Date.now(), date, day,
       minutes: clampInt(b.minutes, 1, 180, 15),
+      seconds: clampInt(b.seconds, 1, 180 * 60, clampInt(b.minutes, 1, 180, 15) * 60), // real wall-clock time
       mood: clampInt(b.mood, 1, 5, 3),
       win: str(b.win, 280),
       short: !!b.short,

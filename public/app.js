@@ -11,7 +11,7 @@ const fmtLong = d => d.toLocaleDateString(undefined, { weekday: 'long', month: '
 const MOODS = ['😖', '😕', '🙂', '😀', '🤩'];
 const MOOD_WORDS = ['Rough', 'Meh', 'Fine', 'Good', 'Great'];
 const BLOCK_ICON = { text: '🧘', chord: '🖐️', changes: '⚡', metronome: '🥁', playalong: '🎵' };
-const BADGE_ICON = { first: '🎸', streak7: '🔥', streak30: '🌋', comeback: '🌱', week4: '🎼', song1: '🐎', song2: '🚪', changes20: '⚡', changes30: '⚡', sessions50: '🏆' };
+const BADGE_ICON = { first: '🎸', streak7: '🔥', streak30: '🌋', comeback: '🌱', week4: '🎼', song1: '🐎', song2: '🚪', song3: '🐦', changes20: '⚡', changes30: '⚡', sessions50: '🏆' };
 
 const S = { data: null, route: 'today', param: null, newBadges: null, toolPair: null };
 const homework = () => (S.data && S.data.profile.homework) || { chords: [], minutes: 3 };
@@ -227,8 +227,24 @@ const P = { active: false };
 function startPractice(day, short, replay) {
   const p = plan(day);
   const blocks = short ? C.shortBlocks(p.blocks) : p.blocks;
-  Object.assign(P, { active: true, plan: p, blocks, i: 0, short: !!short, replay: !!replay, startedAt: Date.now(), phase: 'blocks', mood: 0, win: '', remaining: 0, timer: null, result: null, timeUp: false });
+  clearInterval(P.clock);
+  Object.assign(P, { active: true, plan: p, blocks, i: 0, short: !!short, replay: !!replay, startedAt: Date.now(), phase: 'blocks', mood: 0, win: '', remaining: 0, timer: null, clock: null, result: null, timeUp: false });
+  P.clock = setInterval(paintClock, 1000);
   enterBlock(); location.hash = '#practice';
+}
+// Real time spent in this session, wall clock, independent of the block countdowns.
+const elapsedSec = () => Math.max(0, Math.round((Date.now() - P.startedAt) / 1000));
+const fmtClock = s => `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+const todayLogged = () => (S.data ? S.data.stats.todaySessions.reduce((a, x) => a + (Number(x.minutes) || 0), 0) : 0);
+function paintClock() {
+  const t = $('#pclock'); if (!t) return;
+  const sec = elapsedSec(), before = todayLogged();
+  t.textContent = fmtClock(sec);
+  const tot = $('#ptoday'); if (tot) tot.textContent = before ? `${before + Math.floor(sec / 60)} min today` : '';
+}
+function sessionBar(right) {
+  const before = todayLogged();
+  return `<div class="p-clockrow"><span class="num" id="pclock">${fmtClock(elapsedSec())}</span><span>this session</span>${before ? `<span class="dot">·</span><span id="ptoday">${before + Math.floor(elapsedSec() / 60)} min today</span>` : '<span id="ptoday"></span>'}${right || ''}</div>`;
 }
 function enterBlock() {
   clearInterval(P.timer);
@@ -251,14 +267,15 @@ function nextBlock() {
 }
 function exitPractice() {
   if (P.phase === 'blocks' && !confirm('Leave this session? Nothing will be logged.')) return;
-  Metro.stop(); clearInterval(P.timer); P.active = false; location.hash = '#today';
+  Metro.stop(); clearInterval(P.timer); clearInterval(P.clock); P.active = false; location.hash = '#today';
 }
 async function finishSession() {
-  const minutes = Math.max(1, Math.round((Date.now() - P.startedAt) / 60000));
+  const seconds = Math.max(1, elapsedSec()), minutes = Math.max(1, Math.round(seconds / 60));
   const btn = $('[data-a="finish"]'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
-    const d = await api('POST', '/session', { date: localDate(), day: P.plan.day, minutes, mood: P.mood || 3, win: P.win.trim(), short: P.short, replay: P.replay, blocks: P.blocks.length });
-    setData(d); P.phase = 'done'; P.result = { minutes }; render(); confetti();
+    const d = await api('POST', '/session', { date: localDate(), day: P.plan.day, minutes, seconds, mood: P.mood || 3, win: P.win.trim(), short: P.short, replay: P.replay, blocks: P.blocks.length });
+    clearInterval(P.clock);
+    setData(d); P.phase = 'done'; P.result = { minutes, seconds, today: todayLogged() }; render(); confetti();
   } catch (e) { toast('Could not save: ' + e.message); if (btn) { btn.disabled = false; btn.textContent = 'Finish'; } }
 }
 function confetti() {
@@ -285,9 +302,10 @@ function viewPractice() {
   if (b.type === 'metronome') tool = chordCards(b.chords, false) + grooveHTML(toolId, { bpm: b.bpm, pattern: b.pattern, bars: buildBars(b), label: C.PATTERNS[b.pattern].name });
   if (b.type === 'playalong') tool = grooveHTML(toolId, { bpm: b.bpm, pattern: b.pattern, bars: buildBars(b), label: C.SONGS[b.song].title, song: b.song });
   return `<section class="practice">
-    <header class="p-head"><button class="icon" data-a="exit" aria-label="leave session">✕</button>
+    <header class="p-head"><div class="p-headrow"><button class="icon" data-a="exit" aria-label="leave session">✕</button>
       <div class="segs">${P.blocks.map((_, j) => `<i class="${j < P.i ? 'done' : j === P.i ? 'cur' : ''}"></i>`).join('')}</div>
-      <div class="p-timer num" id="ptimer">${pad(Math.floor(P.remaining / 60))}:${pad(P.remaining % 60)}</div></header>
+      <div class="p-timer num" id="ptimer">${pad(Math.floor(P.remaining / 60))}:${pad(P.remaining % 60)}</div></div>
+      ${sessionBar(`<span class="right">block ${P.i + 1}/${n} · ${b.minutes} min</span>`)}</header>
     <h2 class="p-title">${BLOCK_ICON[b.type] || ''} ${esc(b.title)}</h2>
     <p class="p-sub">Block ${P.i + 1} of ${n} · ${b.minutes} min · Day ${P.plan.day}${P.short ? ' · quick version' : ''}${P.replay ? ' · replay' : ''}</p>
     <ul class="lines">${(b.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul>
@@ -302,12 +320,13 @@ function mountPractice() {
   if (b.type === 'metronome') mountGroove(toolId, { bpm: b.bpm, pattern: b.pattern, bars: buildBars(b), label: C.PATTERNS[b.pattern].name });
   if (b.type === 'playalong') mountGroove(toolId, { bpm: b.bpm, pattern: b.pattern, bars: buildBars(b), label: C.SONGS[b.song].title, song: b.song });
   const t = $('#ptimer'); if (t) paintTimer(t);
+  paintClock();
   if (P.timeUp) { const nb = $('[data-a="next"]'); if (nb) nb.classList.add('timeup'); }
 }
 function viewLog() {
-  const mins = Math.max(1, Math.round((Date.now() - P.startedAt) / 60000));
   return `<section class="practice log">
-    <header class="p-head"><button class="icon" data-a="exit" aria-label="leave">✕</button><div class="segs">${P.blocks.map(() => '<i class="done"></i>').join('')}</div><div class="p-timer num">${mins}m</div></header>
+    <header class="p-head"><div class="p-headrow"><button class="icon" data-a="exit" aria-label="leave">✕</button><div class="segs">${P.blocks.map(() => '<i class="done"></i>').join('')}</div><div class="p-timer num">✓</div></div>
+      ${sessionBar('<span class="right">still counting</span>')}</header>
     <h2 class="p-title">How did that feel?</h2>
     <p class="p-sub">Day ${P.plan.day} · ${esc(P.plan.title)}</p>
     <div class="moods">${MOODS.map((m, i) => `<button data-a="mood" data-m="${i + 1}" class="${P.mood === i + 1 ? 'active' : ''}" aria-label="${MOOD_WORDS[i]}">${m}</button>`).join('')}</div>
@@ -323,7 +342,7 @@ function viewDone() {
     <div class="sub">Day ${P.plan.day} ${P.replay ? 'replayed' : 'done'}</div>
     <div class="bigday">🔥 ${st.streak}</div>
     <div class="sub">${st.streak === 1 ? 'day streak. Every streak starts at one.' : 'day streak' + (st.streak === st.bestStreak && st.streak > 1 ? '. Your best ever.' : '.')}</div>
-    <div class="stats"><div><b class="num">${P.result.minutes}</b><small>minutes</small></div><div><b class="num">${st.totalSessions}</b><small>sessions</small></div><div><b class="num">${Math.round(st.totalMinutes / 60 * 10) / 10}</b><small>hours total</small></div></div>
+    <div class="stats"><div><b class="num">${fmtClock(P.result.seconds)}</b><small>this session</small></div><div><b class="num">${P.result.today}</b><small>min today${st.todaySessions.length > 1 ? ` · ${st.todaySessions.length} sessions` : ''}</small></div><div><b class="num">${Math.round(st.totalMinutes / 60 * 10) / 10}</b><small>hours total</small></div></div>
     ${fresh.length ? `<div class="stack" style="margin-bottom:16px">${fresh.map(id => { const b = defs.find(x => x.id === id); return b ? `<div class="badge"><div class="bi">${BADGE_ICON[id] || '🏅'}</div><div><b>${esc(b.name)}</b><small>${esc(b.desc)}</small></div></div>` : ''; }).join('')}</div>` : ''}
     <p class="quote">“${esc(next.encouragement)}”</p>
     <p class="muted">${P.replay ? `Replays count as practice but never move the program. Your next lesson is still Day ${next.day}, ${esc(next.title)}.` : `Tomorrow: Day ${next.day}, ${esc(next.title)}.`}</p>
@@ -353,7 +372,7 @@ function viewToday() {
     ${gap >= 2 && !done ? `<div class="banner">Welcome back. ${gap} days away reset the streak, not the progress. Day ${n} is right where you left it.</div>` : ''}
     ${done ? `<div class="card hero donecard">
         <div class="eyebrow">Day ${last.day} · done ✓</div>
-        <div class="row" style="margin-top:6px"><span class="mood">${MOODS[(last.mood || 3) - 1]}</span><div><div class="win">${last.win ? '“' + esc(last.win) + '”' : 'Showed up. That is the habit.'}</div><small>${last.minutes} minute${last.minutes === 1 ? '' : 's'}${last.short ? ', quick version' : ''}</small></div></div>
+        <div class="row" style="margin-top:6px"><span class="mood">${MOODS[(last.mood || 3) - 1]}</span><div><div class="win">${last.win ? '“' + esc(last.win) + '”' : 'Showed up. That is the habit.'}</div><small>${todayLogged()} minute${todayLogged() === 1 ? '' : 's'} today${st.todaySessions.length > 1 ? ` across ${st.todaySessions.length} sessions` : ''}${last.short ? ', quick version' : ''}</small></div></div>
         <p style="margin:12px 0 0">See you tomorrow for Day ${n}. Streak safe.</p>
       </div>` :
       `<div class="card hero daycard"><div class="row spread"><div>
@@ -377,7 +396,7 @@ function viewToday() {
 function viewSongs() {
   return `<section><h1 style="margin-bottom:12px">Songs</h1>
     ${Object.values(C.SONGS).map((s, i) => { const bt = bestTempo(s.id); return `<a class="card songcard" href="#song/${s.id}">
-      <small>Song ${i + 1}${i === 1 ? ' · weeks 9 to 12' : ' · weeks 1 to 8'}</small>
+      <small>Song ${i + 1} · ${esc(s.when)}</small>
       <div class="t">${esc(s.title)}</div><div class="a">${esc(s.artist)}, ${s.year}</div>
       <div class="chips">${s.chords.map(c => `<span class="chip">${esc(c)}</span>`).join('')}<span class="chip acc">${esc(C.PATTERNS[s.pattern].name)}</span></div>
       <p class="muted" style="margin:10px 0 0">${bt ? `Your clean tempo: <b>${bt}</b> of ${s.bpm} bpm` : `Target ${s.bpm} bpm. No tempo logged yet.`}</p></a>`; }).join('')}
@@ -454,6 +473,10 @@ function viewProgress() {
   const changesCards = pairs.map(p => { const hist = pairHistory(p).slice(-14); const max = Math.max(...hist.map(h => h.count), 1); const pb = personalBest(p);
     return `<div class="card"><h3>${esc(p[0])} ⇄ ${esc(p[1])} · best ${pb.count}</h3><div class="bars">${hist.map(h => `<i style="height:${Math.max(4, h.count / max * 100)}%"><span>${h.count}</span></i>`).join('')}</div><small>${hist.length} round${hist.length === 1 ? '' : 's'}, oldest to newest</small></div>`; }).join('');
   const tempoRows = Object.values(C.SONGS).map(s => { const bt = bestTempo(s.id); return `<div class="kv"><span>${esc(s.title)}</span><span><b class="num">${bt || '–'}</b> <small>/ ${s.bpm} bpm</small></span></div>`; }).join('');
+  const byDate = {}; d.sessions.forEach(s => { byDate[s.date] = (byDate[s.date] || 0) + (Number(s.minutes) || 0); });
+  const days14 = Array.from({ length: 14 }, (_, i) => { const dt = new Date(); dt.setDate(dt.getDate() - (13 - i)); const k = localDate(dt); return { k, m: byDate[k] || 0 }; });
+  const maxM = Math.max(15, ...days14.map(x => x.m)), avg = Math.round(days14.reduce((a, x) => a + x.m, 0) / 14);
+  const minutesCard = `<div class="card"><h3>Minutes per day · last two weeks</h3><div class="bars">${days14.map(x => `<i class="${x.m ? '' : 'empty'}" style="height:${Math.max(4, x.m / maxM * 100)}%"><span>${x.m || ''}</span></i>`).join('')}</div><small>Real time, from the session clock. Average ${avg} min a day, target 15. Today is the last bar.</small></div>`;
   const earned = new Map(d.badges.map(b => [b.id, b.date]));
   const badges = d.badgeDefs.map(b => `<div class="badge ${earned.has(b.id) ? '' : 'locked'}"><div class="bi">${BADGE_ICON[b.id] || '🏅'}</div><div><b>${esc(b.name)}</b><small>${earned.has(b.id) ? 'Earned ' + fmtDate(earned.get(b.id)) : esc(b.desc)}</small></div></div>`).join('');
   const recent = d.sessions.slice(-7).reverse();
@@ -463,16 +486,17 @@ function viewProgress() {
       <div class="stat"><b class="num">${Math.min(cur - 1, total)}</b><small>of ${total} days</small></div>
       <div class="stat"><b class="num">${Math.round(st.totalMinutes / 60 * 10) / 10}</b><small>hours</small></div></div>
     <div class="card"><h3>The 84 days</h3><div class="grid84">${grid}</div><small style="display:block;margin-top:8px">Dashed boxes are review days. The outlined box is next.</small></div>
+    ${minutesCard}
     <div class="card"><h3>Clean tempo</h3>${tempoRows}<small>Log a tempo from any play-along when a full run sounds clean.</small></div>
     ${changesCards || '<div class="card"><h3>Chord changes</h3><p class="muted">Your one-minute change counts will chart here from week 2.</p></div>'}
     <div class="card"><h3>Badges</h3><div class="badges">${badges}</div></div>
-    ${recent.length ? `<div class="card"><h3>Recent sessions</h3>${recent.map(s => `<div class="kv"><span>${MOODS[(s.mood || 3) - 1]} Day ${s.day} <small>${fmtDate(s.date)}</small></span><span class="muted" style="text-align:right;max-width:55%;font-size:14px">${esc(s.win || '')}</span></div>`).join('')}</div>` : ''}
+    ${recent.length ? `<div class="card"><h3>Recent sessions</h3>${recent.map(s => `<div class="kv"><span>${MOODS[(s.mood || 3) - 1]} Day ${s.day} <small>${fmtDate(s.date)} · ${s.minutes} min</small></span><span class="muted" style="text-align:right;max-width:55%;font-size:14px">${esc(s.win || '')}</span></div>`).join('')}</div>` : ''}
   </section>`;
 }
 
 // ---------- tools ----------
 const TUNING = [['E', 82.41, '6th'], ['A', 110.0, '5th'], ['D', 146.83, '4th'], ['G', 196.0, '3rd'], ['B', 246.94, '2nd'], ['e', 329.63, '1st']];
-const PAIRS = [['Em', 'D6/9'], ['G', 'D'], ['D', 'Am'], ['D', 'C'], ['Am', 'C'], ['G', 'C'], ['G', 'Em']];
+const PAIRS = [['Em', 'D6/9'], ['G', 'D'], ['D', 'Am'], ['D', 'C'], ['Am', 'C'], ['G', 'C'], ['G', 'Em'], ['A', 'D'], ['D', 'E'], ['A', 'E']];
 const TOOL_METRO = { bpm: 80, pattern: 'd_du_udu', bars: [{ chord: '' }], label: 'Metronome', plain: true, pickPattern: true };
 function toolPairs() {
   const hw = homework().chords.filter(c => C.CHORDS[c]), out = [];

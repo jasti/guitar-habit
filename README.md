@@ -4,6 +4,8 @@ Fifteen minutes a day. Two acoustic songs in twelve weeks. Runs on the Mac Mini,
 
 - **Song 1, weeks 1 to 8:** A Horse with No Name (Em, D6/9). Two chords, one strumming pattern.
 - **Song 2, weeks 9 to 12:** Knockin' on Heaven's Door (G, D, Am, C). Same strumming pattern, four new chords.
+- **Song 3, any time:** Three Little Birds (A, D, E). The instructor song: once your homework list covers
+  A, D and E, every third session's homework block is a slow play-along of it.
 
 Every day is a 14 to 15 minute session of three to five timed blocks: warm-up, a chord or
 technique drill, strumming or a play-along with the built-in metronome, and a cool-down.
@@ -60,6 +62,9 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 - **One-minute changes** are logged per chord pair with personal bests, charted on the Progress tab.
 - **Clean tempo** per song is logged from any play-along with "That tempo felt clean".
 - **Badges** for the first session, 7 and 30 day streaks, coming back after a gap, each song, and more.
+- **Session clock.** A sticky header shows the block countdown, the real time spent so far this session, and
+  your running total for the day. Sessions log wall-clock time, not planned time, so the day total on Today
+  and the minutes-per-day chart on Progress show what you actually did.
 - **Lessons tab** lists all 84 days. Open any day to read it or replay it. Replays log practice
   (streak, minutes, changes) but never move the program forward, so previewing day 40 doesn't skip days 2 to 39.
 - **Instructor homework** (Settings): list the chords your teacher assigned, for example `A, D, E, G, C`,
@@ -72,7 +77,7 @@ Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightne
 | Call | Does |
 | --- | --- |
 | `GET /api/state` | Full state plus computed stats |
-| `POST /api/session` | Log a session `{date, day, minutes, mood, win, short, replay}` |
+| `POST /api/session` | Log a session `{date, day, minutes, seconds, mood, win, short, replay}` |
 | `POST /api/metric` | Log `{type:'changes', pair, count}` or `{type:'tempo', song, bpm}` |
 | `POST /api/profile` | Set `{name}`, `{currentDay}`, or `{homework: {chords, minutes}}` |
 | `GET /api/export` | Download the state file |
