@@ -41,6 +41,10 @@ This copies `com.vj.guitar-habit.plist` into `~/Library/LaunchAgents` and loads 
 2. Tap Share, then **Add to Home Screen**.
 3. It opens full-screen like an app, with no browser chrome.
 
+No sound on the iPhone? Flip the Ring/Silent switch to ring and turn the volume up. iOS mutes browser
+audio on silent, and the app plays a silent clip on every tap to work around it, but that does not always
+win. Tools has a **Test sound** button. After the phone locks, the first tap wakes the audio up again.
+
 Tip: iPhone screens lock during long blocks. Set Settings → Display & Brightness → Auto-Lock to
 5 minutes, or just tap the screen now and then. The block timer chimes when time is up.
 

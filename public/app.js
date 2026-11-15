@@ -29,13 +29,33 @@ let toastTimer;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2400); }
 
 // ---------- audio ----------
+// iPhone notes. Safari starts every AudioContext suspended and only lets a user gesture resume it; after the
+// screen locks or a call comes in the context goes to 'interrupted' and must be resumed again. And with the
+// Ring/Silent switch on silent, iOS mutes Web Audio entirely unless an HTML media element is also playing,
+// which flips the page into the "playback" audio category. So: a tiny silent <audio> clip is played on every
+// tap, and the context is resumed on every tap and whenever the page comes back to the foreground.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
 const Snd = {
-  ctx: null,
+  ctx: null, el: null, unlocked: false,
   ensure() {
-    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ctx.addEventListener('statechange', () => { if (this.ctx.state !== 'running') this.unlocked = false; });
+    }
+    if (this.ctx.state !== 'running') this.ctx.resume().then(() => { this.unlocked = true; }).catch(() => {});
+    this.unmute();
     return this.ctx;
   },
+  // Play (or re-play) the silent clip so iOS treats the page as media playback and ignores the silent switch.
+  unmute() {
+    try {
+      if (!this.el) { const a = document.createElement('audio'); a.src = SILENT_WAV; a.setAttribute('playsinline', ''); a.preload = 'auto'; a.volume = 0.01; this.el = a; }
+      if (this.el.paused) { this.el.currentTime = 0; const p = this.el.play(); if (p && p.catch) p.catch(() => {}); }
+    } catch {}
+  },
+  // Called on every gesture once sound has been used at least once, and when the page returns to the foreground.
+  wake() { if (this.ctx) this.ensure(); },
+  test() { this.ensure(); this.chime(); },
   blip(t, freq, gain = 0.3, dur = 0.05) {
     const ctx = this.ctx, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'square'; o.frequency.value = freq;
@@ -511,6 +531,8 @@ function viewTools() {
     <div class="card"><h3>Reference tones</h3><p class="muted" style="margin-top:0">Tap a string and tune yours to match. Low E on the left.</p>
       <div class="tuner">${TUNING.map(([n, f, pos]) => `<button data-a="tone" data-f="${f}">${n}<small>${pos}</small></button>`).join('')}</div></div>
     <div class="card"><h3>Metronome</h3>${grooveHTML('tool-metro', TOOL_METRO)}</div>
+    <div class="card"><h3>No sound?</h3><p class="muted" style="margin-top:0;font-size:14px">On iPhone: flip the Ring/Silent switch to ring, turn the volume up, and make sure Bluetooth isn't sending audio to another device. The first tap after unlocking the phone wakes the audio up again.</p>
+      <button class="ghost" data-a="test-sound" style="margin:0">🔔 Test sound</button></div>
     <div class="card"><h3>One-minute changes</h3>
       ${homework().chords.length ? `<p class="muted" style="margin-top:0;font-size:14px">Your instructor's pairs come first.</p>` : ''}
       <div class="pattern-pick">${pairs.map(p => `<button class="pill ${samePair(p, pair) ? 'active' : ''}" data-a="pair" data-p="${p.join('|')}">${esc(p[0])} ⇄ ${esc(p[1])}</button>`).join('')}</div>
@@ -590,6 +612,7 @@ document.addEventListener('click', async ev => {
       try { setData(await api('POST', '/profile', { homework: { chords: canon, minutes } })); toast(canon.length ? `Homework set: ${canon.join(', ')}` : 'Homework turned off'); render(); } catch (e) { toast(e.message); }
       break; }
     case 'tone': Snd.tone(Number(a.dataset.f)); break;
+    case 'test-sound': Snd.test(); toast(Snd.ctx && Snd.ctx.state === 'running' ? 'Playing a chime. Silent? Check the Ring/Silent switch and the volume.' : 'Audio is blocked by the browser. Tap again.'); break;
     case 'pair': S.toolPair = a.dataset.p.split('|'); render(); break;
     case 'save-name': try { setData(await api('POST', '/profile', { name: $('#name').value })); toast('Saved'); } catch (e) { toast(e.message); } break;
     case 'save-day': try { setData(await api('POST', '/profile', { currentDay: Number($('#curday').value) })); toast(`Next session is Day ${S.data.progress.currentDay}`); } catch (e) { toast(e.message); } break;
@@ -599,6 +622,8 @@ document.addEventListener('click', async ev => {
 document.addEventListener('input', ev => { if (ev.target.id === 'win') P.win = ev.target.value; });
 window.addEventListener('hashchange', render);
 document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && S.route !== 'practice') { try { setData(await api('GET', '/state')); render(); } catch {} } });
+['touchend', 'pointerup', 'keydown'].forEach(t => document.addEventListener(t, () => Snd.wake(), { passive: true, capture: true }));
+['visibilitychange', 'pageshow', 'focus'].forEach(t => window.addEventListener(t, () => { if (document.visibilityState === 'visible') Snd.wake(); }));
 
 (async function init() {
   try { setData(await api('GET', '/state')); }
